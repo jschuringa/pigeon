@@ -5,21 +5,25 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/brianvoe/gofakeit"
 	"github.com/jschuringa/pigeon/pkg/core"
 )
 
 func main() {
-	publishALotOfMessages()
-	// go publishALotOfMessages()
-	// go publishALotOfMessages()
-
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go publishALotOfMessages(&wg)
+	go publishALotOfMessages(&wg)
+	go publishALotOfMessages(&wg)
+	wg.Wait()
 }
 
-func publishALotOfMessages() {
+func publishALotOfMessages(wg *sync.WaitGroup) {
+	defer wg.Done()
 	i := 0
-	for i < 1000 {
+	for i < 1000000 {
 		bm := &core.BaseModel{
 			Val: gofakeit.Name(),
 		}
