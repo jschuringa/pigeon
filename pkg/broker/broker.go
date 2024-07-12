@@ -5,20 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+
+	"github.com/jschuringa/pigeon/pkg/core"
 )
 
 type Broker struct {
+	topics   map[string]*Topic
 	messages []string
-	queue    chan string
+	queue    chan core.Message
 	// sendTo   string
 }
 
-type message struct {
-	Val string `json:"val"`
-}
-
 func (b *Broker) Receive(ctx context.Context) error {
-	b.queue = make(chan string)
+	b.queue = make(chan core.Message)
+	for _, v := range b.topics {
+		go v.Listen(ctx)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -27,8 +29,10 @@ func (b *Broker) Receive(ctx context.Context) error {
 			if !ok {
 				return fmt.Errorf("channel closed unexpectedly")
 			}
-			fmt.Printf("Received message: %s", msg)
-			b.messages = append(b.messages, msg)
+			fmt.Printf("Received message with key: %s", msg.Key)
+			if t, ok := b.topics[msg.Key]; ok {
+				t.queue <- msg
+			}
 		}
 
 	}
@@ -41,10 +45,10 @@ func (b *Broker) Flush() error {
 func (b *Broker) Push(c net.Conn) {
 	msg, err := readMessage(c)
 	if err != nil {
-		fmt.Print("we dropped a message :(")
+		fmt.Print("we dropped a message :(\n")
 		return
 	}
-	b.queue <- msg.Val
+	b.queue <- *msg
 }
 
 func (b *Broker) Start(ctx context.Context) error {
@@ -60,9 +64,9 @@ func (b *Broker) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		default:
-			fmt.Printf("waiting for accept")
+			fmt.Printf("waiting for accept\n")
 			c, err := srv.Accept()
-			fmt.Printf("accepted")
+			fmt.Printf("accepted\n")
 			if err != nil {
 				return err
 			}
@@ -74,24 +78,16 @@ func (b *Broker) Start(ctx context.Context) error {
 func New() *Broker {
 	return &Broker{
 		messages: make([]string, 0),
+		topics:   make(map[string]*Topic, 0),
 	}
 }
 
-func readMessage(c net.Conn) (*message, error) {
-	// l := make([]byte, 2) // takes the first two bytes: the Length Message.
-	// i, _ := c.Read(l)    // read the bytes.
-
-	// lm := binary.BigEndian.Uint16(l[:i]) // convert the bytes into int16.
-
-	// b := make([]byte, lm) // create the byte buffer for the body.
-	// e, _ := c.Read(b)     // read the bytes.
-	b := make([]byte, 0)
-	c.Read(b)
-
-	msg := &message{}
-	err := json.Unmarshal(b, msg)
+func readMessage(c net.Conn) (*core.Message, error) {
+	msg := &core.Message{}
+	dec := json.NewDecoder(c)
+	err := dec.Decode(&msg)
 	if err != nil {
 		return nil, err
 	}
-	return msg, nil // returns the body
+	return msg, nil
 }
