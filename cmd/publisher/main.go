@@ -3,27 +3,35 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net"
+	"math/rand"
 	"os"
 	"sync"
+	"time"
+
+	"github.com/jschuringa/pigeon/internal/connection"
+	"github.com/jschuringa/pigeon/pkg/core"
 
 	"github.com/brianvoe/gofakeit"
-	"github.com/jschuringa/pigeon/pkg/core"
 )
 
 func main() {
+
+	pool := connection.NewTCPPool("localhost", 8080, 25, 50)
+
 	var wg sync.WaitGroup
-	wg.Add(3)
-	go publishALotOfMessages(&wg)
-	go publishALotOfMessages(&wg)
-	go publishALotOfMessages(&wg)
+	wg.Add(1)
+	go publishALotOfMessages(&wg, pool)
+	// go publishALotOfMessages(&wg, pool)
+	// go publishALotOfMessages(&wg, pool)
 	wg.Wait()
+	os.Exit(0)
 }
 
-func publishALotOfMessages(wg *sync.WaitGroup) {
+func publishALotOfMessages(wg *sync.WaitGroup, pool *connection.TCPPool) {
 	defer wg.Done()
 	i := 0
-	for i < 1000000 {
+	for i < 10000 {
+		time.Sleep(1000 * time.Duration(rand.Int()))
 		bm := &core.BaseModel{
 			Val: gofakeit.Name(),
 		}
@@ -44,19 +52,24 @@ func publishALotOfMessages(wg *sync.WaitGroup) {
 			Content: encoded,
 		}
 
-		conn, err := net.Dial("tcp", "localhost:8080")
+		conn, err := pool.Get()
 		if err != nil {
 			println("Dial failed:", err.Error())
 			os.Exit(1)
 		}
-		defer conn.Close()
 
-		enc := json.NewEncoder(conn)
-		err = enc.Encode(&msg)
+		encMsg, err := json.Marshal(&msg)
+		if err != nil {
+			fmt.Printf("Marshalling msg failed: %s", err)
+			os.Exit(1)
+		}
+
+		err = conn.Send(encMsg)
 		if err != nil {
 			fmt.Printf("Err: %v", err)
 			os.Exit(1)
 		}
 		i++
+		pool.Put(conn)
 	}
 }

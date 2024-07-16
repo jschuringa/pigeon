@@ -38,7 +38,7 @@ func (t *Topic) Listen(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Message received on topoic %s: %s\n", t.Name, res)
+			fmt.Printf("Message received on topic %s: %s\n", t.Name, res)
 		}
 	}
 }

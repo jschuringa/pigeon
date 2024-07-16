@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/jschuringa/pigeon/internal/listener"
 	"github.com/jschuringa/pigeon/pkg/core"
 )
 
@@ -29,7 +30,7 @@ func (b *Broker) Receive(ctx context.Context) error {
 			if !ok {
 				return fmt.Errorf("channel closed unexpectedly")
 			}
-			fmt.Printf("Received message with key: %s", msg.Key)
+			fmt.Printf("Received message with key: %s\n\n", msg.Key)
 			if t, ok := b.topics[msg.Key]; ok {
 				t.queue <- msg
 			}
@@ -53,7 +54,8 @@ func (b *Broker) Push(c net.Conn) {
 
 func (b *Broker) Start(ctx context.Context) error {
 	go b.Receive(ctx)
-	srv, err := net.Listen("tcp", "localhost:8080")
+	l := listener.NewListener("localhost", 8080)
+	srv, err := l.Start(ctx)
 	if err != nil {
 		return err
 	}
