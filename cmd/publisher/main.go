@@ -19,9 +19,9 @@ func main() {
 	pool := connection.NewTCPPool("localhost", 8080, 25, 50)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(2)
 	go publishALotOfMessages(&wg, pool)
-	// go publishALotOfMessages(&wg, pool)
+	go publishALotOfMessages(&wg, pool)
 	// go publishALotOfMessages(&wg, pool)
 	wg.Wait()
 	os.Exit(0)
@@ -31,7 +31,7 @@ func publishALotOfMessages(wg *sync.WaitGroup, pool *connection.TCPPool) {
 	defer wg.Done()
 	i := 0
 	for i < 10000 {
-		time.Sleep(1000 * time.Duration(rand.Int()))
+		time.Sleep(1000 * time.Duration(rand.Intn(10)))
 		bm := &core.BaseModel{
 			Val: gofakeit.Name(),
 		}
@@ -48,8 +48,8 @@ func publishALotOfMessages(wg *sync.WaitGroup, pool *connection.TCPPool) {
 		}
 
 		msg := &core.Message{
-			Key:     key,
-			Content: encoded,
+			Key:  key,
+			Body: encoded,
 		}
 
 		conn, err := pool.Get()
@@ -70,6 +70,6 @@ func publishALotOfMessages(wg *sync.WaitGroup, pool *connection.TCPPool) {
 			os.Exit(1)
 		}
 		i++
-		pool.Put(conn)
+		pool.Close(conn)
 	}
 }

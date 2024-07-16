@@ -43,7 +43,8 @@ func (b *Broker) Flush() error {
 	return fmt.Errorf("not implemented")
 }
 
-func (b *Broker) Push(c net.Conn) {
+func (b *Broker) Handle(c net.Conn) {
+	defer c.Close()
 	msg, err := readMessage(c)
 	if err != nil {
 		fmt.Print("we dropped a message :(\n")
@@ -72,7 +73,7 @@ func (b *Broker) Start(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			go b.Push(c)
+			go b.Handle(c)
 		}
 	}
 }

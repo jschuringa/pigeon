@@ -45,7 +45,7 @@ func (t *Topic) Listen(ctx context.Context) error {
 
 func decode(msg core.Message) (string, error) {
 	bm := &core.BaseModel{}
-	err := json.Unmarshal(msg.Content, &bm)
+	err := json.Unmarshal(msg.Body, &bm)
 	if err != nil {
 		return "", err
 	}

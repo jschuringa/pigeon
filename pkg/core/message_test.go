@@ -41,7 +41,7 @@ func TestMessage_GetContent(t *testing.T) {
 			if err != nil {
 				t.Fatal("could not marshal content")
 			}
-			res, err := core.GetContent[core.BaseModel](&core.Message{Content: enc})
+			res, err := core.GetContent[core.BaseModel](&core.Message{Body: enc})
 			if err != nil {
 				if !c.wantErr {
 					t.Fatalf("GetContent failed: %v", err)

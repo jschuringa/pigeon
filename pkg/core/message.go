@@ -3,13 +3,16 @@ package core
 import "encoding/json"
 
 type Message struct {
-	Key     string `json:"key"`
-	Content []byte `json:"content"`
+	Key string `json:"key"`
+	// eventually msg id, other message metadata
+
+	// this should be encrypted (eventually)
+	Body []byte `json:"body"`
 }
 
 func GetContent[T any](m *Message) (*T, error) {
 	var c *T
-	err := json.Unmarshal(m.Content, &c)
+	err := json.Unmarshal(m.Body, &c)
 	if err != nil {
 		return nil, err
 	}
@@ -17,14 +20,14 @@ func GetContent[T any](m *Message) (*T, error) {
 	return c, nil
 }
 
-func NewMessage(key string, content any) (*Message, error) {
-	barr, err := json.Marshal(content)
+func NewMessage(key string, body any) (*Message, error) {
+	barr, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Message{
-		Content: barr,
-		Key:     key,
+		Body: barr,
+		Key:  key,
 	}, nil
 }
