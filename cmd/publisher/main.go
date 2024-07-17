@@ -16,7 +16,7 @@ import (
 
 func main() {
 
-	pool := connection.NewTCPPool("localhost", 8080, 25, 50)
+	pool := connection.NewTCPPool("localhost", 9090, 25, 50)
 
 	var wg sync.WaitGroup
 	wg.Add(2)

@@ -4,14 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/jschuringa/pigeon/pkg/core"
 )
 
 type Topic struct {
-	Name  string
-	Key   string
-	queue chan core.Message
+	Name     string
+	Key      string
+	queue    chan core.Message
+	queues   []*Queue
+	queueMtx sync.Mutex
 }
 
 func RegisterTopic(b *Broker, name, key string) error {
@@ -21,7 +25,7 @@ func RegisterTopic(b *Broker, name, key string) error {
 		queue: make(chan core.Message),
 	}
 
-	b.topics[key] = t
+	b.topics.Store(key, t)
 	return nil
 }
 
@@ -39,15 +43,27 @@ func (t *Topic) Listen(ctx context.Context) error {
 				return err
 			}
 			fmt.Printf("Message received on topic %s: %s\n", t.Name, res)
+			for _, q := range t.queues {
+				q.Receive(res)
+			}
 		}
 	}
 }
 
-func decode(msg core.Message) (string, error) {
+func (t *Topic) AddQueue(ctx context.Context, name string, conn *websocket.Conn) error {
+	q := NewQueue(name, conn)
+	t.queueMtx.Lock()
+	t.queues = append(t.queues, q)
+	t.queueMtx.Unlock()
+	q.Start(ctx)
+	return nil
+}
+
+func decode(msg core.Message) (*core.BaseModel, error) {
 	bm := &core.BaseModel{}
 	err := json.Unmarshal(msg.Body, &bm)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return bm.Val, nil
+	return bm, nil
 }
