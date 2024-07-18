@@ -1,15 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/jschuringa/pigeon/internal/connection"
 	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/pkg/publisher"
 
 	"github.com/brianvoe/gofakeit"
 )
@@ -17,59 +18,27 @@ import (
 func main() {
 
 	pool := connection.NewTCPPool("localhost", 9090, 25, 50)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go publishALotOfMessages(&wg, pool)
-	go publishALotOfMessages(&wg, pool)
-	// go publishALotOfMessages(&wg, pool)
-	wg.Wait()
-	os.Exit(0)
-}
-
-func publishALotOfMessages(wg *sync.WaitGroup, pool *connection.TCPPool) {
-	defer wg.Done()
+	ctx := context.Background()
+	p := publisher.NewPublisher(ctx, pool)
 	i := 0
-	for i < 10000 {
-		time.Sleep(1000 * time.Duration(rand.Intn(10)))
+	for i < 1000 {
+		time.Sleep(10000 * time.Duration(rand.Intn(10)))
+		topic := "topic1"
+		if i%rand.Intn(9) == 0 {
+			topic = "topic2"
+		}
+
 		bm := &core.BaseModel{
 			Val: gofakeit.Name(),
 		}
-
-		key := "topic1"
-		if i%2 == 0 {
-			key = "topic2"
-		}
-
 		encoded, err := json.Marshal(bm)
 		if err != nil {
-			fmt.Printf("error: %v", err)
+			fmt.Printf("error: %s", err)
 			os.Exit(1)
 		}
 
-		msg := &core.Message{
-			Key:  key,
-			Body: encoded,
+		if err := p.Publish(topic, encoded); err != nil {
+			fmt.Printf("error: %s", err)
 		}
-
-		conn, err := pool.Get()
-		if err != nil {
-			println("Dial failed:", err.Error())
-			os.Exit(1)
-		}
-
-		encMsg, err := json.Marshal(&msg)
-		if err != nil {
-			fmt.Printf("Marshalling msg failed: %s", err)
-			os.Exit(1)
-		}
-
-		err = conn.Send(encMsg)
-		if err != nil {
-			fmt.Printf("Err: %v", err)
-			os.Exit(1)
-		}
-		i++
-		pool.Close(conn)
 	}
 }

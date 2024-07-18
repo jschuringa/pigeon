@@ -49,7 +49,7 @@ func (b *Broker) SubscriberServer(ctx context.Context) {
 			return
 		}
 
-		t.AddQueue(ctx, req.Name, conn)
+		t.Subscribe(ctx, req.Name, conn)
 	})
 
 	http.ListenAndServe("localhost:8080", nil)

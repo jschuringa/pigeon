@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gorilla/websocket"
 	"github.com/jschuringa/pigeon/pkg/core"
+
+	"github.com/gorilla/websocket"
 )
 
 // Queue allows us to build a queue for each
@@ -24,7 +25,7 @@ func NewQueue(name string, conn *websocket.Conn) *Queue {
 	}
 }
 
-func (q *Queue) Receive(msg *core.BaseModel) {
+func (q *Queue) Push(msg *core.BaseModel) {
 	q.queue <- msg
 }
 

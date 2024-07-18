@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gorilla/websocket"
 	"github.com/jschuringa/pigeon/pkg/core"
+
+	"github.com/gorilla/websocket"
 )
 
 type Topic struct {
@@ -44,13 +45,13 @@ func (t *Topic) Listen(ctx context.Context) error {
 			}
 			fmt.Printf("Message received on topic %s: %s\n", t.Name, res)
 			for _, q := range t.queues {
-				q.Receive(res)
+				q.Push(res)
 			}
 		}
 	}
 }
 
-func (t *Topic) AddQueue(ctx context.Context, name string, conn *websocket.Conn) error {
+func (t *Topic) Subscribe(ctx context.Context, name string, conn *websocket.Conn) error {
 	q := NewQueue(name, conn)
 	t.queueMtx.Lock()
 	t.queues = append(t.queues, q)
