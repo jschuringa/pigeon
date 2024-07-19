@@ -6,36 +6,33 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/internal/core"
 
 	"github.com/gorilla/websocket"
 )
 
-type Topic struct {
+type Router struct {
 	Name     string
 	Key      string
-	queue    chan core.Message
+	inbound  chan core.Message
 	queues   []*Queue
 	queueMtx sync.Mutex
 }
 
-func RegisterTopic(b *Broker, name, key string) error {
-	t := &Topic{
-		Name:  name,
-		Key:   key,
-		queue: make(chan core.Message),
+func NewRouter(name, key string) *Router {
+	return &Router{
+		Name:    name,
+		Key:     key,
+		inbound: make(chan core.Message),
 	}
-
-	b.topics.Store(key, t)
-	return nil
 }
 
-func (t *Topic) Listen(ctx context.Context) error {
+func (t *Router) Listen(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case msg, ok := <-t.queue:
+		case msg, ok := <-t.inbound:
 			if !ok {
 				return fmt.Errorf("topic %s channel closed unexpectedly", t.Name)
 			}
@@ -51,13 +48,12 @@ func (t *Topic) Listen(ctx context.Context) error {
 	}
 }
 
-func (t *Topic) Subscribe(ctx context.Context, name string, conn *websocket.Conn) error {
+func (t *Router) Subscribe(ctx context.Context, name string, conn *websocket.Conn) error {
 	q := NewQueue(name, conn)
 	t.queueMtx.Lock()
 	t.queues = append(t.queues, q)
 	t.queueMtx.Unlock()
-	q.Start(ctx)
-	return nil
+	return q.Start(ctx)
 }
 
 func decode(msg core.Message) (*core.BaseModel, error) {

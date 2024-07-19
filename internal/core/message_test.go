@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/internal/core"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestMessage_GetContent(t *testing.T) {
+func TestMessage_Content(t *testing.T) {
 	t.Parallel()
 	type testCase struct {
 		name    string
@@ -41,7 +41,7 @@ func TestMessage_GetContent(t *testing.T) {
 			if err != nil {
 				t.Fatal("could not marshal content")
 			}
-			res, err := core.GetContent[core.BaseModel](&core.Message{Body: enc})
+			res, err := core.Content[core.BaseModel](&core.Message{Body: enc})
 			if err != nil {
 				if !c.wantErr {
 					t.Fatalf("GetContent failed: %v", err)

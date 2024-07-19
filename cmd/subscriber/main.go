@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/internal/core"
 	"github.com/jschuringa/pigeon/pkg/subscriber"
 )
 
@@ -24,13 +24,23 @@ func main() {
 
 	topic1Sub := subscriber.NewSubscriber(cfg, "Topic 1")
 	topic2Sub := subscriber.NewSubscriber(cfg, "Topic 2")
+	go func() {
+		err := topic1Sub.Subscribe(ctx, "topic1", printMessageTopicOne)
+		if err != nil {
+			// err chan + retry?
+			return
+		}
+	}()
 
-	go topic1Sub.Subscribe(ctx, "topic1", printMessageTopicOne)
-	go topic2Sub.Subscribe(ctx, "topic2", printMessageTopicTwo)
-	select {
-	case <-interrupt:
-		cancel()
-	}
+	go func() {
+		err := topic2Sub.Subscribe(ctx, "topic2", printMessageTopicTwo)
+		if err != nil {
+			return
+		}
+	}()
+
+	<-interrupt
+	cancel()
 }
 
 func printMessageTopicOne(data []byte) error {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/internal/core"
 
 	"github.com/gorilla/websocket"
 )
@@ -42,22 +42,27 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string, handler func([
 	}
 	defer c.Close()
 
-	done := make(chan struct{})
-
+	// Send message to connect to topics queue
 	msg := &core.SubscriberRequest{
 		Key:  topic,
 		Name: s.name,
 	}
 	c.WriteJSON(&msg)
 
+	// read ack registration here eventually
+
 	go func() {
-		defer close(done)
 		for {
-			_, barr, err := c.ReadMessage()
-			if err != nil {
+			select {
+			case <-ctx.Done():
 				return
+			default:
+				_, barr, err := c.ReadMessage()
+				if err != nil {
+					return
+				}
+				handler(barr)
 			}
-			handler(barr)
 		}
 	}()
 	<-ctx.Done()

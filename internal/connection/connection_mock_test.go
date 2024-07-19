@@ -5,47 +5,47 @@ import (
 	"time"
 )
 
-type mockNetConnection struct {
+type MockNetConnection struct {
 	err error
 }
 
 // LocalAddr implements net.Conn.
-func (m *mockNetConnection) LocalAddr() net.Addr {
+func (m *MockNetConnection) LocalAddr() net.Addr {
 	panic("unimplemented")
 }
 
 // Read implements net.Conn.
-func (m *mockNetConnection) Read(b []byte) (n int, err error) {
+func (m *MockNetConnection) Read(b []byte) (n int, err error) {
 	return 0, m.err
 }
 
 // RemoteAddr implements net.Conn.
-func (m *mockNetConnection) RemoteAddr() net.Addr {
+func (m *MockNetConnection) RemoteAddr() net.Addr {
 	panic("unimplemented")
 }
 
 // SetDeadline implements net.Conn.
-func (m *mockNetConnection) SetDeadline(t time.Time) error {
+func (m *MockNetConnection) SetDeadline(t time.Time) error {
 	panic("unimplemented")
 }
 
 // SetReadDeadline implements net.Conn.
-func (m *mockNetConnection) SetReadDeadline(t time.Time) error {
+func (m *MockNetConnection) SetReadDeadline(t time.Time) error {
 	panic("unimplemented")
 }
 
 // SetWriteDeadline implements net.Conn.
-func (m *mockNetConnection) SetWriteDeadline(t time.Time) error {
+func (m *MockNetConnection) SetWriteDeadline(t time.Time) error {
 	panic("unimplemented")
 }
 
 // Write implements net.Conn.
-func (m *mockNetConnection) Write(b []byte) (n int, err error) {
+func (m *MockNetConnection) Write(b []byte) (n int, err error) {
 	return 0, m.err
 }
 
-func (m *mockNetConnection) Close() error {
+func (m *MockNetConnection) Close() error {
 	return m.err
 }
 
-var _ net.Conn = (*mockNetConnection)(nil)
+var _ net.Conn = (*MockNetConnection)(nil)

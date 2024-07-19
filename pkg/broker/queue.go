@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/internal/core"
 
 	"github.com/gorilla/websocket"
 )
@@ -29,16 +29,20 @@ func (q *Queue) Push(msg *core.BaseModel) {
 	q.queue <- msg
 }
 
-func (q *Queue) Start(ctx context.Context) {
+func (q *Queue) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
 		case msg, ok := <-q.queue:
 			if !ok {
-				fmt.Printf("Channel for queue %s closed unexpectedly", q.name)
+				// this would mean a dropped message, so need some retry logic
+				return fmt.Errorf("Channel for queue %s closed unexpectedly", q.name)
 			}
-			q.conn.WriteJSON(msg)
+			err := q.conn.WriteJSON(msg)
+			if err != nil {
+				return err
+			}
 		}
 	}
 }

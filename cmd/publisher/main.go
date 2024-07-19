@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/jschuringa/pigeon/internal/connection"
-	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/internal/core"
 	"github.com/jschuringa/pigeon/pkg/publisher"
 
 	"github.com/brianvoe/gofakeit"
@@ -39,5 +39,4 @@ func main() {
 		}
 		i++
 	}
-	<-c
 }

@@ -8,60 +8,118 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/jschuringa/pigeon/internal/core"
 	"github.com/jschuringa/pigeon/internal/listener"
-	"github.com/jschuringa/pigeon/pkg/core"
 
 	"github.com/gorilla/websocket"
 )
 
 type Broker struct {
 	// we should only write each topic once to this
-	topics   sync.Map
-	messages []string
-	queue    chan core.Message
+	routes  sync.Map
+	queue   chan core.Message
+	errChan chan error
 }
 
-func (b *Broker) SubscriberServer(ctx context.Context) {
+// Right now, running as a websockets server.
+// Raw TCP proved very cumbersome
+// Long term, move off websockets to a better implemented TPC and IPC solution
+func (b *Broker) Server(ctx context.Context, host string, port int) {
+	srv := &http.Server{Addr: fmt.Sprintf("%s:%d", host, port)}
 	http.HandleFunc("/subscribe", func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
+			// just return for now until sending errors figured out
 			fmt.Printf("failed to start websocket")
+			return
 		}
 
 		// expect subscriber id, and last record id from connection
-		// but for now, ask for topic, get all messages stored from that topic
+		// but for now, ask for topic, get all messages that show up
 
 		defer conn.Close()
-
-		// first we need to read the topic from the request
-		var req *core.SubscriberRequest
-		err = conn.ReadJSON(&req)
-		if err != nil {
-			fmt.Printf("failed to read subscriber request: %s", err)
-			return
-		}
-
-		// can probably add a helper function that wraps this all so don't need to constantly do it
-		t, err := b.getTopic(req.Key)
-		if err != nil {
-			fmt.Printf("failed to get topic: %s", err)
-			return
-		}
-
-		t.Subscribe(ctx, req.Name, conn)
+		b.handleSubscribe(ctx, conn)
 	})
 
-	http.ListenAndServe("localhost:8080", nil)
+	// http.HandleFunc("/publish", func(w http.ResponseWriter, r *http.Request) {
+	// 	upgrader := websocket.Upgrader{}
+	// 	conn, err := upgrader.Upgrade(w, r, nil)
+	// 	if err != nil {
+	// 		fmt.Printf("failed to start websocket")
+	// 	}
+
+	// 	// expect subscriber id, and last record id from connection
+	// 	// but for now, ask for topic, get all messages that show up
+
+	// 	defer conn.Close()
+	// 	b.handlePublish(ctx, conn)
+	// })
+
+	go func(errChan chan error) {
+		if err := srv.ListenAndServe(); err != nil {
+			errChan <- err
+		}
+	}(b.errChan)
+	<-ctx.Done()
+	srv.Close()
 }
 
-func (b *Broker) getTopic(key string) (*Topic, error) {
-	v, ok := b.topics.Load(key)
+func (b *Broker) handleSubscribe(ctx context.Context, conn *websocket.Conn) error {
+	// first we need to read the topic from the request
+	var req *core.SubscriberRequest
+	err := conn.ReadJSON(&req)
+	if err != nil {
+		return err
+	}
+
+	// then ensure the topic exists by getting the registered router
+	t, err := b.getRouter(req.Key)
+	if err != nil {
+		return err
+	}
+
+	// then start subscribing to the topic
+	return t.Subscribe(ctx, req.Name, conn)
+}
+
+// todo: if need to refactor TCP, can use websockets temporarily to communicate
+// func (b *Broker) handlePublish(ctx context.Context, conn *websocket.Conn) error {
+// 	for {
+// 		select {
+// 		case <-ctx.Done():
+// 			return nil
+// 		default:
+// 			var msg *core.Message
+// 			err := conn.ReadJSON(&msg)
+// 			if err != nil {
+// 				return err
+// 			}
+// 		case msg, ok := <-q.queue:
+// 			if !ok {
+// 				// this would mean a dropped message, so need some retry logic
+// 				return fmt.Errorf("Channel for queue %s closed unexpectedly", q.name)
+// 			}
+// 			err := q.conn.WriteJSON(msg)
+// 			if err != nil {
+// 				return err
+// 			}
+// 		}
+// 	}
+// }
+
+func (b *Broker) RegisterRouter(name, key string) {
+	rtr := NewRouter(name, key)
+	b.routes.Store(key, rtr)
+}
+
+func (b *Broker) getRouter(key string) (*Router, error) {
+	v, ok := b.routes.Load(key)
 	if !ok {
 		return nil, fmt.Errorf("topic does not exist")
 	}
 
-	t, ok := v.(*Topic)
+	t, ok := v.(*Router)
 	if !ok {
 		// better error message - probably could add a wrapper around the sync map (Topics?)
 		// so that we're not worried about the type being wrong ever
@@ -73,14 +131,17 @@ func (b *Broker) getTopic(key string) (*Topic, error) {
 
 func (b *Broker) Receive(ctx context.Context) error {
 	b.queue = make(chan core.Message)
-	b.topics.Range(func(_, v any) bool {
-		// currently only subscribers registered through startup would work
-		// can expose api eventually to add during runtime
-		t, ok := v.(*Topic)
+	b.routes.Range(func(_, v any) bool {
+		// currently can only register topics at startup
+		t, ok := v.(*Router)
 		if !ok {
-			fmt.Printf("range over topic failed")
+			b.errChan <- fmt.Errorf("couldn't range over topic")
 		}
-		go t.Listen(ctx)
+		go func(errChan chan error) {
+			if err := t.Listen(ctx); err != nil {
+				errChan <- err
+			}
+		}(b.errChan)
 		return true
 	})
 	for {
@@ -91,14 +152,12 @@ func (b *Broker) Receive(ctx context.Context) error {
 			if !ok {
 				return fmt.Errorf("channel closed unexpectedly")
 			}
-			fmt.Printf("Received message with key: %s\n\n", msg.Key)
-			if v, ok := b.topics.Load(msg.Key); ok {
-				t, ok := v.(*Topic)
-				if !ok {
-					fmt.Printf("failed to load topic")
-				}
-				t.queue <- msg
+			fmt.Printf("Received message with key: %s\n", msg.Key)
+			rtr, err := b.getRouter(msg.Key)
+			if err != nil {
+				return err
 			}
+			rtr.inbound <- msg
 		}
 	}
 }
@@ -107,15 +166,22 @@ func (b *Broker) Handle(c net.Conn) {
 	defer c.Close()
 	msg, err := readMessage(c)
 	if err != nil {
-		fmt.Print("we dropped a message :(\n")
+		b.errChan <- err
 		return
 	}
 	b.queue <- *msg
 }
 
 func (b *Broker) Start(ctx context.Context) error {
-	go b.Receive(ctx)
-	go b.SubscriberServer(ctx)
+	go func(errChan chan error) {
+		if err := b.Receive(ctx); err != nil {
+			errChan <- err
+		}
+	}(b.errChan)
+	go func(errChan chan error) {
+		b.Server(ctx, "localhost", 8080)
+	}(b.errChan)
+
 	l := listener.NewListener("localhost", 9090)
 	srv, err := l.Start(ctx)
 	if err != nil {
@@ -127,10 +193,13 @@ func (b *Broker) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
+		case err, ok := <-b.errChan:
+			if !ok {
+				return fmt.Errorf("broker err chan closed unexpectedly")
+			}
+			return err
 		default:
-			fmt.Printf("waiting for accept\n")
 			c, err := srv.Accept()
-			fmt.Printf("accepted\n")
 			if err != nil {
 				return err
 			}
@@ -141,8 +210,7 @@ func (b *Broker) Start(ctx context.Context) error {
 
 func New() *Broker {
 	return &Broker{
-		messages: make([]string, 0),
-		topics:   sync.Map{},
+		routes: sync.Map{},
 	}
 }
 

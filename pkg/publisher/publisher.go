@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jschuringa/pigeon/internal/connection"
-	"github.com/jschuringa/pigeon/pkg/core"
+	"github.com/jschuringa/pigeon/internal/core"
 )
 
 type Publisher struct {
@@ -31,6 +31,7 @@ func NewPublisher(ctx context.Context, pool *connection.TCPPool) *Publisher {
 	}
 
 	// maybe I could build this into fx or something? curious how kafka libraries do it
+	// goroutine pool for just the publisher logic?
 	go p.start(ctx)
 	return p
 }

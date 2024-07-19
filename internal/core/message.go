@@ -10,7 +10,7 @@ type Message struct {
 	Body []byte `json:"body"`
 }
 
-func GetContent[T any](m *Message) (*T, error) {
+func Content[T any](m *Message) (*T, error) {
 	var c *T
 	err := json.Unmarshal(m.Body, &c)
 	if err != nil {
