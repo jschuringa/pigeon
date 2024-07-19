@@ -9,5 +9,5 @@ The subscriber connects to the broker via websockets, and registers which topic 
 
 The publisher creats a TCP connection to the broker, and sends a message. It currently does not wait for acknowledgement of the message.
 
-# Examples
+## Examples
 A sample implementation exists in the CMD folder structure.
