@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/jschuringa/pigeon/internal/core"
 
@@ -14,7 +17,7 @@ import (
 type Router struct {
 	Name     string
 	Key      string
-	inbound  chan core.Message
+	inbound  chan *core.Message
 	queues   []*Queue
 	queueMtx sync.Mutex
 }
@@ -23,7 +26,7 @@ func NewRouter(name, key string) *Router {
 	return &Router{
 		Name:    name,
 		Key:     key,
-		inbound: make(chan core.Message),
+		inbound: make(chan *core.Message),
 	}
 }
 
@@ -36,13 +39,10 @@ func (t *Router) Listen(ctx context.Context) error {
 			if !ok {
 				return fmt.Errorf("topic %s channel closed unexpectedly", t.Name)
 			}
-			res, err := decode(msg)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("Message received on topic %s: %s\n", t.Name, res)
+			log.Printf("Message received on topic %s", t.Name)
+			t.writeToFile(msg)
 			for _, q := range t.queues {
-				q.Push(res)
+				q.Push(msg)
 			}
 		}
 	}
@@ -56,11 +56,18 @@ func (t *Router) Subscribe(ctx context.Context, name string, conn *websocket.Con
 	return q.Start(ctx)
 }
 
-func decode(msg core.Message) (*core.BaseModel, error) {
-	bm := &core.BaseModel{}
-	err := json.Unmarshal(msg.Body, &bm)
+func (t *Router) writeToFile(msg *core.Message) error {
+	barr, err := json.Marshal(&msg)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return bm, nil
+	err = os.MkdirAll(fmt.Sprintf("./msgs/%s", t.Key), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(fmt.Sprintf("./msgs/%s/%d.json", t.Key, time.Now().Unix()), barr, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
