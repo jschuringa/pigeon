@@ -12,21 +12,21 @@ import (
 // Queue allows us to build a queue for each
 // subscriber that connects
 type Queue struct {
-	name  string
-	conn  *websocket.Conn
-	queue chan *core.BaseModel
+	name     string
+	conn     *websocket.Conn
+	outbound chan *core.Message
 }
 
 func NewQueue(name string, conn *websocket.Conn) *Queue {
 	return &Queue{
-		name:  name,
-		conn:  conn,
-		queue: make(chan *core.BaseModel),
+		name:     name,
+		conn:     conn,
+		outbound: make(chan *core.Message),
 	}
 }
 
-func (q *Queue) Push(msg *core.BaseModel) {
-	q.queue <- msg
+func (q *Queue) Push(msg *core.Message) {
+	q.outbound <- msg
 }
 
 func (q *Queue) Start(ctx context.Context) error {
@@ -34,10 +34,10 @@ func (q *Queue) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		case msg, ok := <-q.queue:
+		case msg, ok := <-q.outbound:
 			if !ok {
 				// this would mean a dropped message, so need some retry logic
-				return fmt.Errorf("Channel for queue %s closed unexpectedly", q.name)
+				return fmt.Errorf("channel for queue %s closed unexpectedly", q.name)
 			}
 			err := q.conn.WriteJSON(msg)
 			if err != nil {

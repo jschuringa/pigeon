@@ -8,7 +8,12 @@ import (
 )
 
 func main() {
-	b := broker.New()
+	b := broker.New(&broker.Config{
+		WSHost:  "localhost",
+		WSPort:  8080,
+		TCPHost: "localhost",
+		TCPPort: 9090,
+	})
 	b.RegisterRouter("Topic 1", "topic1")
 	b.RegisterRouter("Topic 2", "topic2")
 	err := b.Start(context.Background())

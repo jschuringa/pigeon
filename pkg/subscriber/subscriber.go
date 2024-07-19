@@ -47,7 +47,10 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string, handler func([
 		Key:  topic,
 		Name: s.name,
 	}
-	c.WriteJSON(&msg)
+	err = c.WriteJSON(&msg)
+	if err != nil {
+		return err
+	}
 
 	// read ack registration here eventually
 

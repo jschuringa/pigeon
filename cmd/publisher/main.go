@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/jschuringa/pigeon/internal/connection"
@@ -17,8 +14,6 @@ import (
 )
 
 func main() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	pool := connection.NewTCPPool("localhost", 9090, 25, 50)
 	ctx := context.Background()
 	p := publisher.NewPublisher(ctx, pool)
